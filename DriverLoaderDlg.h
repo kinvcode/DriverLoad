@@ -55,4 +55,5 @@ public:
 	void alreadyStart();
 	void alreadyStop();
 	void alreadyUninstall();
+	afx_msg void OnClose();
 };

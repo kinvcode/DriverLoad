@@ -47,6 +47,7 @@ BEGIN_MESSAGE_MAP(CDriverLoaderDlg, CDialogEx)
 	ON_BN_CLICKED(IDC_BUTTON4, &CDriverLoaderDlg::OnBnClickedButton4)
 	ON_BN_CLICKED(IDC_BUTTON5, &CDriverLoaderDlg::OnBnClickedButton5)
 	ON_BN_CLICKED(IDC_BUTTON6, &CDriverLoaderDlg::OnBnClickedButton6)
+	ON_WM_CLOSE()
 END_MESSAGE_MAP()
 
 
@@ -151,7 +152,6 @@ void CDriverLoaderDlg::OnBnClickedButton3()
 		SERVICE_ALL_ACCESS,
 		SERVICE_KERNEL_DRIVER,
 		SERVICE_DEMAND_START,
-		//SERVICE_ERROR_NORMAL,
 		SERVICE_ERROR_IGNORE,
 		m_sys_path,
 		NULL,
@@ -203,6 +203,16 @@ void CDriverLoaderDlg::OnBnClickedButton4()
 void CDriverLoaderDlg::OnBnClickedButton5()
 {
 	// 停止
+	SERVICE_STATUS service_status;
+
+	if (!::ControlService(m_sc_service, SERVICE_CONTROL_STOP, &service_status))
+	{
+		m_ctl_tip.SetWindowText(L"停止驱动失败");
+		return;
+	}
+
+	m_sc_service = NULL;
+
 	alreadyStop();
 
 
@@ -213,6 +223,23 @@ void CDriverLoaderDlg::OnBnClickedButton5()
 void CDriverLoaderDlg::OnBnClickedButton6()
 {
 	// 卸载
+
+	if (m_sc_service != NULL) 
+	{
+		if (!::DeleteService(m_sc_service))
+		{
+			m_ctl_tip.SetWindowText(L"卸载驱动失败");
+		}
+		CloseServiceHandle(m_sc_service);
+		m_sc_service = NULL;
+	}
+
+	if (m_sc_manager != NULL) 
+	{
+		CloseServiceHandle(m_sc_manager);
+		m_sc_manager = NULL;
+	}
+
 	alreadyUninstall();
 	// TODO: 在此添加控件通知处理程序代码
 }
@@ -260,12 +287,15 @@ void CDriverLoaderDlg::alreadyInstalled()
 	m_ctl_browse.EnableWindow(FALSE);
 	m_ctl_install.EnableWindow(FALSE);
 	m_ctl_start.EnableWindow(TRUE);
-	m_ctl_uninstall.EnableWindow(TRUE);
+	m_ctl_stop.EnableWindow(FALSE);
+	m_ctl_uninstall.EnableWindow(FALSE);
 	m_ctl_tip.SetWindowText(L"安装驱动成功");
 }
 
 void CDriverLoaderDlg::alreadyStart()
 {
+	m_ctl_browse.EnableWindow(FALSE);
+	m_ctl_install.EnableWindow(FALSE);
 	m_ctl_start.EnableWindow(FALSE);
 	m_ctl_stop.EnableWindow(TRUE);
 	m_ctl_tip.SetWindowText(L"驱动启动成功");
@@ -273,6 +303,9 @@ void CDriverLoaderDlg::alreadyStart()
 
 void CDriverLoaderDlg::alreadyStop()
 {
+	m_ctl_browse.EnableWindow(FALSE);
+	m_ctl_install.EnableWindow(FALSE);
+	m_ctl_start.EnableWindow(FALSE);
 	m_ctl_stop.EnableWindow(FALSE);
 	m_ctl_uninstall.EnableWindow(TRUE);
 	m_ctl_tip.SetWindowText(L"驱动停止成功");
@@ -280,8 +313,24 @@ void CDriverLoaderDlg::alreadyStop()
 
 void CDriverLoaderDlg::alreadyUninstall()
 {
-	m_ctl_uninstall.EnableWindow(FALSE);
 	m_ctl_browse.EnableWindow(TRUE);
+	m_ctl_install.EnableWindow(FALSE);
+	m_ctl_start.EnableWindow(FALSE);
+	m_ctl_stop.EnableWindow(FALSE);
+	m_ctl_uninstall.EnableWindow(FALSE);
 	m_ctl_tip.SetWindowText(L"驱动卸载成功");
 	m_ctl_path.SetWindowText(L"");
+}
+
+
+void CDriverLoaderDlg::OnClose()
+{
+	// TODO: 在此添加消息处理程序代码和/或调用默认值
+	if (m_sc_service != NULL) {
+		CloseServiceHandle(m_sc_service);
+	}
+	if (m_sc_manager != NULL) {
+		CloseServiceHandle(m_sc_manager);
+	}
+	CDialogEx::OnClose();
 }
