@@ -61,6 +61,9 @@ BOOL CDriverLoaderDlg::OnInitDialog()
 	SetIcon(m_hIcon, TRUE);			// 设置大图标
 	SetIcon(m_hIcon, FALSE);		// 设置小图标
 
+	ChangeWindowMessageFilter(WM_DROPFILES, MSGFLT_ADD);
+	ChangeWindowMessageFilter(0x0049, MSGFLT_ADD);       // 0x0049 == WM_COPYGLOBALDATA
+
 	// TODO: 在此添加额外的初始化代码
 	m_ctl_install.EnableWindow(FALSE);
 	m_ctl_start.EnableWindow(FALSE);
@@ -109,14 +112,17 @@ HCURSOR CDriverLoaderDlg::OnQueryDragIcon()
 void CDriverLoaderDlg::OnBnClickedButton2()
 {
 	// 选择文件
-	CString strFile = _T("");
+	CString file_path = _T("");
+	CString file_name = _T("");
 	CFileDialog    dlgFile(TRUE, NULL, NULL, OFN_HIDEREADONLY, _T("驱动文件 (*.sys)|*.sys||"), NULL);
 	if (dlgFile.DoModal())
 	{
-		strFile = dlgFile.GetPathName();
-		if (strFile.Find(L".sys") != -1) {
-			m_ctl_path.SetWindowText(strFile);
-			m_sys_name = getSysNameByPath(strFile);
+		file_path = dlgFile.GetPathName();
+		file_name = dlgFile.GetFileName();
+		if (file_path.Find(L".sys") != -1) {
+			m_ctl_path.SetWindowText(file_path);
+			wcscpy_s(m_sys_path, MAX_PATH, file_path);
+			wcscpy_s(m_sys_name, MAX_PATH, file_name);
 			allowInstall();
 		}
 	}
@@ -127,6 +133,8 @@ void CDriverLoaderDlg::OnBnClickedButton3()
 {
 	// 安装
 
+	DWORD status;
+
 	// 打开服务管理器数据库
 	m_sc_manager = OpenSCManager(NULL, NULL, SC_MANAGER_ALL_ACCESS);
 	if (m_sc_manager == NULL)
@@ -136,20 +144,59 @@ void CDriverLoaderDlg::OnBnClickedButton3()
 	}
 
 	// 创建服务
-	//m_sc_service = CreateService(m_sc_manager,,, SERVICE_ALL_ACCESS);
+	m_sc_service = CreateServiceW(
+		m_sc_manager,
+		m_sys_name,
+		m_sys_name,
+		SERVICE_ALL_ACCESS,
+		SERVICE_KERNEL_DRIVER,
+		SERVICE_DEMAND_START,
+		//SERVICE_ERROR_NORMAL,
+		SERVICE_ERROR_IGNORE,
+		m_sys_path,
+		NULL,
+		NULL,
+		NULL,
+		NULL,
+		NULL);
 
+	if (m_sc_service == NULL)
+	{
+		status = GetLastError();
+		if (status != ERROR_SERVICE_EXISTS)
+		{
+			m_ctl_tip.SetWindowText(L"安装驱动失败：无法创建服务");
+			return;
+		}
+	}
 
-	// TODO: 在此添加控件通知处理程序代码
+	// 打开服务
+	m_sc_service = OpenService(m_sc_manager, m_sys_name, SERVICE_ALL_ACCESS);
+	if (m_sc_service == NULL) {
+		m_ctl_tip.SetWindowText(L"安装驱动失败：无法打开服务");
+		return;
+	}
 
 	alreadyInstalled();
 }
 
 void CDriverLoaderDlg::OnBnClickedButton4()
 {
+	DWORD status;
+
 	// 启动
 
+	if (!StartService(m_sc_service, 0, NULL))
+	{
+		status = GetLastError();
+		if (status != ERROR_SERVICE_ALREADY_RUNNING)
+		{
+			m_ctl_tip.SetWindowText(L"启动驱动失败");
+			return;
+		}
+	}
+
 	alreadyStart();
-	// TODO: 在此添加控件通知处理程序代码
 }
 
 
@@ -182,16 +229,22 @@ void CDriverLoaderDlg::OnDropFiles(HDROP hDropInfo)
 
 	wchar_t filepath[MAX_PATH];
 	DragQueryFile(hDropInfo, 0, filepath, MAX_PATH);
+	wcscpy_s(m_sys_path, MAX_PATH, filepath);
 
-	CString path = CString(filepath);
+	LPWSTR file_name = filepath;
+	PathStripPathW(file_name);
+	wcscpy_s(m_sys_name, MAX_PATH, file_name);
+
+	CString path = CString(m_sys_path);
 	if (path.Find(L".sys") != -1) {
 		m_ctl_path.SetWindowText(path);
-		m_sys_name = getSysNameByPath(path);
 		allowInstall();
 	}
 	else {
 		AfxMessageBox(L"仅支持sys文件");
 	}
+
+	CDialogEx::OnDropFiles(hDropInfo);
 
 	CDialogEx::OnDropFiles(hDropInfo);
 }
@@ -231,11 +284,4 @@ void CDriverLoaderDlg::alreadyUninstall()
 	m_ctl_browse.EnableWindow(TRUE);
 	m_ctl_tip.SetWindowText(L"驱动卸载成功");
 	m_ctl_path.SetWindowText(L"");
-}
-
-CString CDriverLoaderDlg::getSysNameByPath(CString path) 
-{
-	LPWSTR lpwStr = (LPWSTR)(LPCTSTR)path;
-	PathStripPath(lpwStr);
-	return CString(lpwStr);
 }

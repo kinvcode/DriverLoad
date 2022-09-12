@@ -48,11 +48,11 @@ public:
 public:
 	SC_HANDLE m_sc_manager;
 	SC_HANDLE m_sc_service;
-	CString m_sys_name;
+	wchar_t m_sys_path[MAX_PATH];
+	wchar_t m_sys_name[MAX_PATH];
 	void allowInstall();
 	void alreadyInstalled();
 	void alreadyStart();
 	void alreadyStop();
 	void alreadyUninstall();
-	CString getSysNameByPath(CString path);
 };
