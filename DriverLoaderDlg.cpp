@@ -7,6 +7,7 @@
 #include "DriverLoader.h"
 #include "DriverLoaderDlg.h"
 #include "afxdialogex.h"
+#include <stdlib.h>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -21,6 +22,8 @@ CDriverLoaderDlg::CDriverLoaderDlg(CWnd* pParent /*=nullptr*/)
 	: CDialogEx(IDD_DRIVER_LOADER_DIALOG, pParent)
 {
 	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
+	// 初始化变量
+	m_sc_manager = NULL;
 }
 
 void CDriverLoaderDlg::DoDataExchange(CDataExchange* pDX)
@@ -113,6 +116,7 @@ void CDriverLoaderDlg::OnBnClickedButton2()
 		strFile = dlgFile.GetPathName();
 		if (strFile.Find(L".sys") != -1) {
 			m_ctl_path.SetWindowText(strFile);
+			m_sys_name = getSysNameByPath(strFile);
 			allowInstall();
 		}
 	}
@@ -122,6 +126,19 @@ void CDriverLoaderDlg::OnBnClickedButton2()
 void CDriverLoaderDlg::OnBnClickedButton3()
 {
 	// 安装
+
+	// 打开服务管理器数据库
+	m_sc_manager = OpenSCManager(NULL, NULL, SC_MANAGER_ALL_ACCESS);
+	if (m_sc_manager == NULL)
+	{
+		m_ctl_tip.SetWindowText(L"安装驱动失败：无法打开驱动管理器");
+		return;
+	}
+
+	// 创建服务
+	//m_sc_service = CreateService(m_sc_manager,,, SERVICE_ALL_ACCESS);
+
+
 	// TODO: 在此添加控件通知处理程序代码
 
 	alreadyInstalled();
@@ -169,6 +186,7 @@ void CDriverLoaderDlg::OnDropFiles(HDROP hDropInfo)
 	CString path = CString(filepath);
 	if (path.Find(L".sys") != -1) {
 		m_ctl_path.SetWindowText(path);
+		m_sys_name = getSysNameByPath(path);
 		allowInstall();
 	}
 	else {
@@ -184,7 +202,7 @@ void CDriverLoaderDlg::allowInstall()
 	m_ctl_tip.SetWindowText(L"等待安装驱动");
 }
 
-void CDriverLoaderDlg::alreadyInstalled() 
+void CDriverLoaderDlg::alreadyInstalled()
 {
 	m_ctl_browse.EnableWindow(FALSE);
 	m_ctl_install.EnableWindow(FALSE);
@@ -193,7 +211,7 @@ void CDriverLoaderDlg::alreadyInstalled()
 	m_ctl_tip.SetWindowText(L"安装驱动成功");
 }
 
-void CDriverLoaderDlg::alreadyStart() 
+void CDriverLoaderDlg::alreadyStart()
 {
 	m_ctl_start.EnableWindow(FALSE);
 	m_ctl_stop.EnableWindow(TRUE);
@@ -213,4 +231,11 @@ void CDriverLoaderDlg::alreadyUninstall()
 	m_ctl_browse.EnableWindow(TRUE);
 	m_ctl_tip.SetWindowText(L"驱动卸载成功");
 	m_ctl_path.SetWindowText(L"");
+}
+
+CString CDriverLoaderDlg::getSysNameByPath(CString path) 
+{
+	LPWSTR lpwStr = (LPWSTR)(LPCTSTR)path;
+	PathStripPath(lpwStr);
+	return CString(lpwStr);
 }

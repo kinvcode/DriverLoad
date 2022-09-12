@@ -3,6 +3,7 @@
 //
 
 #pragma once
+#include <winsvc.h>
 
 
 // CDriverLoaderDlg 对话框
@@ -45,9 +46,13 @@ public:
 	afx_msg void OnBnClickedButton5();
 	afx_msg void OnBnClickedButton6();
 public:
+	SC_HANDLE m_sc_manager;
+	SC_HANDLE m_sc_service;
+	CString m_sys_name;
 	void allowInstall();
 	void alreadyInstalled();
 	void alreadyStart();
 	void alreadyStop();
 	void alreadyUninstall();
+	CString getSysNameByPath(CString path);
 };
